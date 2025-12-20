@@ -454,7 +454,6 @@ function barplot(y, xlabels, err,config)
     
     hold on;
 
-    err=err.*10; % fix error from /500 to /50
     if exist('err', 'var')
         er = errorbar(x,y,err); 
         for ier = 1:numel(er)
