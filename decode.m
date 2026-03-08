@@ -38,7 +38,6 @@ subjects = {...
 config = {'allChans - normalized power',...
 };
 
-
 nBars = length(subjects);
 % nBars = 1;
 nGroups = length(config);
@@ -72,13 +71,17 @@ for igroup = 1:nGroups
 end
 
 
-% save('yourvariablename.mat','groupedBars','groupedErr','shapVals','meanBetas','maxBetas')
+save('test.mat','groupedBars','groupedErr','shapVals','meanBetas','maxBetas')
 
 %% accuracies plot
-% load('yourvariablename.mat')
+% load('test.mat')
+subject = {... 
+'BW42'};
+config = {'allChans - normalized power',...
+};
 
-barplot(groupedBars, subject, groupedErr, config)
-% weightsplot(meanBetas,maxBetas,sel_chan_number,subjects) % only most recent sub and condition
+% barplot(groupedBars, subject, groupedErr, config)
+weightsplot(meanBetas,maxBetas,sel_chan_number,subject) % only most recent sub and condition
 
 %%
 
@@ -327,7 +330,8 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
         end
     
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SVM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    
+        fprintf('Running %s Permutation %d \n',subjects{i_sub},i_randsamp)
+
         n_sample = n;
    
         if m_number_out ~= 0
@@ -409,9 +413,6 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
     max_weights = max_beta;
 end
 
-
-
-
 function barplot(y, xlabels, err,config)
 
     [nBars, nGroups] = size(y);
@@ -475,7 +476,7 @@ function weightsplot(mean_weights,max_weights,sel_chan_number,subject)
 
     RegionLabels = {'dlPFC', 'dmPFC', 'OFC', 'vlPFC', 'STG', 'MTG', 'ITG', 'dACC', 'AMY', 'HIP'};
     % inputPath = fullfile('outputDataChronux_ratio', subject);
-    inputPath = fullfile('outputPowerData_nolog','theta',subject);
+    inputPath = fullfile('c_outputPowerData_nolog','highGamma',subject);
     filesToLoad = {'ROIbyChannel.mat'};
     
     for i = 1:length(filesToLoad)
