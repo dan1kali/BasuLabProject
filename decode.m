@@ -75,13 +75,21 @@ save('test.mat','groupedBars','groupedErr','shapVals','meanBetas','maxBetas')
 
 %% accuracies plot
 % load('test.mat')
-subject = {... 
-'BW42'};
+subjects = {... 
+'BW42', 'MG51b', 'MG79', 'MG86', ...
+'MG89', 'MG90', 'MG91', 'MG95', ...
+'MG96', 'MG99', 'MG102', 'MG104', ...
+'MG105', 'MG106', 'MG111', 'MG112',...
+'MG116', 'MG117', 'MG118', 'MG120',...
+'UCMC01', 'UCMC02', 'UCMC03', 'UCMC05', ...
+'UCMC06', 'UCMC07', 'UCMC08', 'UCMC09', ...
+'UCMC11', 'UCMC13', 'UCMC14', 'UCMC15', 'UCMC17',...
+};
 config = {'allChans - normalized power',...
 };
 
-% barplot(groupedBars, subject, groupedErr, config)
-weightsplot(meanBetas,maxBetas,sel_chan_number,subject) % only most recent sub and condition
+barplot(groupedBars, subjects, groupedErr, config)
+% weightsplot(meanBetas,maxBetas,sel_chan_number,subject) % only most recent sub and condition
 
 %%
 
@@ -121,7 +129,7 @@ ylim([0 175]); xlim([0 21]); title('Min Number of Trials per Patient')
 
 %% functions
 
-function [fea_number_con, fea_number_in, m_number_out,sel_chan_number,n] = concatenateFeatures(m_number, config,inputPath)
+function [fea_number_con, fea_number_in, m_number_out,sel_chan_number] = concatenateFeatures(m_number, config,inputPath)
     
     % inputPath = fullfile('outputDataChronux_zscore',subject);
     % inputPath = fullfile('outputPowerData_nolog','highGamma',subject);
@@ -234,15 +242,15 @@ function [fea_number_con, fea_number_in, m_number_out,sel_chan_number,n] = conca
         sel_chan_number = 1:length(conPowerFeatures{1});
     end
 
-    n = min(length(conPower), length(inPower));
-
-    % n=40;
+    n_con=length(conPower); % all con trials used
+    n_in=length(inPower);   % all incon trials used
 
     if ~isempty(sel_chan_number)
-
+           con_trlidx = 1:n_con;
+           in_trlidx = 1:n_in;
 
         for i = 1:length(sel_chan_number)
-            %%%%%%%%%%%%%% move randsample outside the loop %%%%%%%%%%%%%%%
+            %randomizes only once per subject
              
             ch = sel_chan_number(i); 
             % --- Max Power: Pull from Column 2 ---
@@ -251,12 +259,13 @@ function [fea_number_con, fea_number_in, m_number_out,sel_chan_number,n] = conca
             % --- Mean Power: Pull from Column 1 ---
             conMeanVals = cellfun(@(x) x(ch,1), conPower);  % con mean across trials
             inMeanVals = cellfun(@(x) x(ch,1), inPower);   % in mean across trials
-
-            fea_number_con(1:n, m_number) = randsample(conMaxVals, n);
-            fea_number_in(1:n, m_number) = randsample(inMaxVals, n);
+            
+            % Updated code for downsampling overrepresented class
+            fea_number_con(1:n_con, m_number) = conMaxVals(con_trlidx); 
+            fea_number_in(1:n_in, m_number) = inMaxVals(in_trlidx);
             m_number = m_number + 1;
-            fea_number_con(1:n, m_number) = randsample(conMeanVals, n);
-            fea_number_in(1:n, m_number) = randsample(inMeanVals, n);
+            fea_number_con(1:n_con, m_number) = conMeanVals(con_trlidx);
+            fea_number_in(1:n_in, m_number) = inMeanVals(in_trlidx);
             m_number = m_number + 1;
 
         end
@@ -318,12 +327,12 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
             inputPath1 = fullfile('c_outputPowerData_log','highGamma',subjects{i_sub});
             % inputPath2 = fullfile('outputPowerData_nolog','theta',subjects{i_sub});
 
-            [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number, n] = concatenateFeatures(m_number,config,inputPath1);
+            [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number] = concatenateFeatures(m_number,config,inputPath1);
             fea_number_con = [fea_number_con, fea_con_tmp]; % Concatenate horizontally
             fea_number_in = [fea_number_in, fea_in_tmp];
             
             if exist('inputPath2', 'var') % do this to do theta and gamma together
-                [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number, n] = concatenateFeatures(m_number,config,inputPath2);
+                [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number] = concatenateFeatures(m_number,config,inputPath2);
                 fea_number_con = [fea_number_con, fea_con_tmp]; % Concatenate horizontally
                 fea_number_in = [fea_number_in, fea_in_tmp];
             end
@@ -332,13 +341,13 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SVM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         fprintf('Running %s Permutation %d \n',subjects{i_sub},i_randsamp)
 
-        n_sample = n;
+        n_folds = 10;
    
         if m_number_out ~= 0
 
             X = real([fea_number_con; fea_number_in]);   % samples x features
-            Y = [zeros(n_sample,1); ones(n_sample,1)];  % labels
-            cv = cvpartition(Y,'KFold',10);
+            Y = [zeros(size(fea_number_con, 1),1); ones(size(fea_number_in, 1),1)];  % labels
+            cv = cvpartition(Y,"KFold",n_folds,"Stratify",true);
 
             for i = 1:cv.NumTestSets
                 train_idx = training(cv,i);
