@@ -104,7 +104,7 @@ save('groupedRegionAccuracies_wavelet_nolog_theta.mat','groupedRegionAccuracies'
 % save('regionAccuracies_wavelet_nolog_theta.mat','regionAccuracies')
 
 %% functions
-
+ 
 function [fea_number_con, fea_number_in, m_number_out,sel_chan_number] = concatenateFeatures(m_number, config,inputPath)
     
     % inputPath = fullfile('outputDataChronux_zscore',subject);
