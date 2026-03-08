@@ -22,7 +22,7 @@
 % 'region chans - normalized power',..
 
 
-%% Plot Patient Data
+%% Obtain Patient Data
 
 subjects = {... 
 'BW42', 'MG51b', 'MG79', 'MG86', ...
@@ -43,13 +43,15 @@ nBars = length(subjects);
 nGroups = length(config);
 groupedBars = zeros(nBars,nGroups);
 groupedErr = zeros(nBars,nGroups);
+sigVals = zeros(nBars,nGroups);
+pVals = zeros(nBars,nGroups);
 shapVals = cell(nBars,nGroups);
 meanBetas = cell(nBars,nGroups);
 maxBetas = cell(nBars,nGroups);
 
 for igroup = 1:nGroups
     % try
-    if nBars ==1
+    if nBars==1
         [y, err,shap,mean_weights,max_weights,sel_chan_number]  = SVM(subjects(:),config(igroup));
         groupedBars(:,igroup) = y;
         groupedErr(:,igroup) = err;
@@ -63,6 +65,7 @@ for igroup = 1:nGroups
             shapVals{ibar,igroup} = shap;
             meanBetas{ibar,igroup} = mean_weights;
             maxBetas{ibar,igroup} = max_weights;
+            [sigVals(ibar,igroup),pVals(ibar,igroup)] = sigTesting(subjects(ibar),config(igroup),y);
         end
     end
     % catch ME
@@ -70,26 +73,14 @@ for igroup = 1:nGroups
     % end
 end
 
+save('test.mat','groupedBars','groupedErr','shapVals','meanBetas','maxBetas','sigVals','pVals')
+% save('c_plotData_alltrials.mat','sigVals','pVals','-append')
 
-save('test.mat','groupedBars','groupedErr','shapVals','meanBetas','maxBetas')
+%% Plot accuracies by patient
+% load('c_plotData_alltrials.mat')
 
-%% accuracies plot
-% load('test.mat')
-subjects = {... 
-'BW42', 'MG51b', 'MG79', 'MG86', ...
-'MG89', 'MG90', 'MG91', 'MG95', ...
-'MG96', 'MG99', 'MG102', 'MG104', ...
-'MG105', 'MG106', 'MG111', 'MG112',...
-'MG116', 'MG117', 'MG118', 'MG120',...
-'UCMC01', 'UCMC02', 'UCMC03', 'UCMC05', ...
-'UCMC06', 'UCMC07', 'UCMC08', 'UCMC09', ...
-'UCMC11', 'UCMC13', 'UCMC14', 'UCMC15', 'UCMC17',...
-};
-config = {'allChans - normalized power',...
-};
-
-barplot(groupedBars, subjects, groupedErr, config)
-% weightsplot(meanBetas,maxBetas,sel_chan_number,subject) % only most recent sub and condition
+barplot(groupedBars, subjects, groupedErr, config, sigVals)
+% weightsplot(meanBetas,maxBetas,sel_chan_number,subject) % only works for 1 sub and condition
 
 %%
 
@@ -111,21 +102,6 @@ end
 
 save('groupedRegionAccuracies_wavelet_nolog_theta.mat','groupedRegionAccuracies')
 % save('regionAccuracies_wavelet_nolog_theta.mat','regionAccuracies')
-
-
-%% Plot number of channels/min number of Trials
-
-subjects = {'BW42', 'MG51b', 'MG79', 'MG86', ...
-'MG89', 'MG90',  'MG91', 'MG95', ...
-'MG96', 'MG99', 'MG102', 'MG104', ...
-'MG105', 'MG106', 'MG111', 'MG112',...
-'MG116', 'MG117', 'MG118', 'MG120'};
-
-nChannels = nTrialsMin(subjects);
-
-barplot(nChannels, subjects);
-ylim([0 175]); xlim([0 21]); title('Min Number of Trials per Patient')
-
 
 %% functions
 
@@ -276,46 +252,9 @@ function [fea_number_con, fea_number_in, m_number_out,sel_chan_number] = concate
     end
 end
 
-function nChannels = numberChannels(subjects)
-nChannels = zeros(length(subjects));
-
-    for i_sub = 1:length(subjects)
-        inputPath = fullfile('outputData', subjects);
-        
-        filesToLoad = {'conPowerFeatures.mat'};
-        
-        for i = 1:length(filesToLoad)
-            load(fullfile(inputPath{i_sub}, filesToLoad{i}));
-        end
-
-    nChannels(i_sub) = size(conPowerFeatures{1},1);
-    end
-
-end
-
-function nTrialsMin = nTrialsMin(subjects)
-nTrialsMin = zeros(length(subjects));
-
-    for i_sub = 1:length(subjects)
-        inputPath = fullfile('outputData', subjects);
-        
-        filesToLoad = {'conPowerFeatures.mat','inPowerFeatures.mat'};
-        
-        for i = 1:length(filesToLoad)
-            load(fullfile(inputPath{i_sub}, filesToLoad{i}));
-        end
-
-    nConTrials = numel(conPowerFeatures);
-    nInTrials = numel(inPowerFeatures);
-
-    nTrialsMin(i_sub) = min(nConTrials, nInTrials);
-    end
-
-end
-
 function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,config)
 
-    for i_randsamp = 1:50
+    for i_randsamp = 1%:50
     % m_number = 1;
     fea_number_con = [];
     fea_number_in = [];
@@ -349,9 +288,9 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
             Y = [zeros(size(fea_number_con, 1),1); ones(size(fea_number_in, 1),1)];  % labels
             cv = cvpartition(Y,"KFold",n_folds,"Stratify",true);
 
-            for i = 1:cv.NumTestSets
-                train_idx = training(cv,i);
-                test_idx  = test(cv,i);
+            for i_folds = 1:cv.NumTestSets
+                train_idx = training(cv,i_folds);
+                test_idx  = test(cv,i_folds);
                 X_train = X(train_idx,:);
                 Y_train = Y(train_idx);
                 X_test  = X(test_idx,:);
@@ -367,19 +306,19 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
                 means_idx = 1:2:nChannels;
                 max_idx   = 2:2:nChannels;
             
-                if i_randsamp == 1 && i == 1
+                if i_randsamp == 1 && i_folds == 1
                     mean_beta = zeros(length(means_idx), 10, 50);
                     max_beta  = zeros(length(max_idx), 10, 50);
                     allShapVals = cell(10,50);
                     meanShapVals = zeros(nChannels, 10, 50);
                 end
             
-                mean_beta(:,i,i_randsamp) = beta(means_idx);
-                max_beta(:,i,i_randsamp)  = beta(max_idx);
+                mean_beta(:,i_folds,i_randsamp) = beta(means_idx);
+                max_beta(:,i_folds,i_randsamp)  = beta(max_idx);
             
                 % Prediction accuracy
                 labels = predict(Mdl, X_test);
-                correct_number(i_randsamp,i) = mean(labels == Y_test)*100;
+                correct_number(i_randsamp,i_folds) = mean(labels == Y_test)*100;
             
                 % ~~~~ Shapley Values ~~~~~
                 S = shapley(Mdl, X_train);  % X_train is  background
@@ -396,8 +335,8 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
                     end
                 end
             
-                allShapVals{i,i_randsamp} = abs(shapVals);
-                meanShapVals(:,i,i_randsamp) = mean(abs(shapVals),2);
+                allShapVals{i_folds,i_randsamp} = abs(shapVals);
+                meanShapVals(:,i_folds,i_randsamp) = mean(abs(shapVals),2);
             
                 clear Mdl
             end
@@ -422,9 +361,103 @@ function [y,err,shap,mean_weights,max_weights,sel_chan_number] = SVM(subjects,co
     max_weights = max_beta;
 end
 
-function barplot(y, xlabels, err,config)
+function [sigTestResult,pVal] = sigTesting(subjects,config,numbercorrect)
+
+n_perm=1000;
+
+fprintf('~~ %s Sig Testing Permutation Shuffling ~~\n',subjects{1})
+h = waitbar(0, 'Shuffling...');  % create waitbar
+
+    for i_perm = 1:n_perm
+    % m_number = 1;
+    fea_number_con = [];
+    fea_number_in = [];
+    
+        for i_sub = 1:length(subjects)
+            m_number = 1;
+
+            % inputPath = fullfile('outputDataChronux_zscore',subject);
+            inputPath1 = fullfile('c_outputPowerData_log','highGamma',subjects{i_sub});
+            % inputPath2 = fullfile('outputPowerData_nolog','theta',subjects{i_sub});
+
+            [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number] = concatenateFeatures(m_number,config,inputPath1);
+            fea_number_con = [fea_number_con, fea_con_tmp]; % Concatenate horizontally
+            fea_number_in = [fea_number_in, fea_in_tmp];
+            
+            if exist('inputPath2', 'var') % do this to do theta and gamma together
+                [fea_con_tmp, fea_in_tmp, m_number_out,sel_chan_number] = concatenateFeatures(m_number,config,inputPath2);
+                fea_number_con = [fea_number_con, fea_con_tmp]; % Concatenate horizontally
+                fea_number_in = [fea_number_in, fea_in_tmp];
+            end
+        end
+    
+        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% SVM %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % fprintf('~~ Processing %d of %d ~~\r',i_perm,n_perm); 
+        waitbar(i_perm/n_perm, h, sprintf('Shuffling %d of %d', i_perm,n_perm));
+
+        n_folds = 10;
+   
+        if m_number_out ~= 0
+
+            X = real([fea_number_con; fea_number_in]);   % samples x features
+            Y_orig = [zeros(size(fea_number_con, 1),1); ones(size(fea_number_in, 1),1)];  % labels
+            Y = Y_orig(randperm(length(Y_orig)));      % rand shuffled
+            cv = cvpartition(Y,"KFold",n_folds,"Stratify",true);
+
+            for i = 1:cv.NumTestSets
+                train_idx = training(cv,i);
+                test_idx  = test(cv,i);
+                X_train = X(train_idx,:);
+                Y_train = Y(train_idx);
+                X_test  = X(test_idx,:);
+                Y_test  = Y(test_idx);
+                % Train SVM
+                Mdl = fitcsvm(X_train, Y_train, 'Standardize', true, 'KernelFunction', 'linear');
+                        
+                % Prediction accuracy
+                labels = predict(Mdl, X_test);
+                correct_number(i_perm,i) = mean(labels == Y_test)*100;
+            
+                clear Mdl
+            end
+
+        else
+            correct_number = 0;
+        end
+       
+    end 
+    
+    close(h);  % close waitbar
+    shuffled_scores = [mean(correct_number,2)];
+    pVal = (sum(shuffled_scores >= numbercorrect)) / (n_perm);
+
+    % figure;
+    % histogram(shuffled_scores)
+    % title(sprintf('Patient %s', subjects{i_sub})
+    % hold on
+    % xline(numbercorrect,'r','LineWidth',2)
+
+    alpha = 0.05;
+    if pVal < alpha
+        fprintf('%s Significant: p val=%.3f  <0.05\n\n',subjects{i_sub},pVal)
+        sigTestResult=1;
+    else
+        fprintf('%s Not Significant: p val=%.3f  not <0.05\n\n',subjects{i_sub},pVal)
+        sigTestResult=0;
+    end
+end
+
+function barplot(y, xlabels, err,config,varargin)
 
     [nBars, nGroups] = size(y);
+
+    if isscalar(varargin)
+        sigVals = varargin{1};
+        pVals = [];
+    elseif length(varargin) == 2
+        sigVals = varargin{1};
+        pVals  = varargin{2};
+    end
 
     figure;
     if size(y,1)==1 % if b only has one grouping
@@ -449,8 +482,11 @@ function barplot(y, xlabels, err,config)
         xlim([0 (nBars+1)]);
         xticks(1:nBars); xtickangle(45); xticklabels(xlabels);xlabel('Patient');
         x = nan(nBars, nGroups);
+        y = nan(nBars, nGroups);
+        xPos=b.XData;
         for i = 1:nGroups
           x(:,i) = b(i).XEndPoints;
+          y(:,i) = b(i).YData;
           % b(i).Labels = b(i).YData;
         end
         line([0 (nBars+1)],[50 50],'color','k','linestyle','--','linewidth',1);
@@ -467,14 +503,21 @@ function barplot(y, xlabels, err,config)
     if exist('err', 'var')
         er = errorbar(x,y,err); 
         for ier = 1:numel(er)
-        er(ier).LineStyle = 'none'; er(ier).CapSize = 5; er(ier).Color = [0 0 0];
+            er(ier).LineStyle = 'none'; er(ier).CapSize = 5; er(ier).Color = [0 0 0];
+        end
+        if exist('sigVals', 'var')
+            for i_sub=1:length(y)
+                if sigVals(i_sub)==1
+                    text(xPos(i_sub)-0.25, y(i_sub)+er.YPositiveDelta(i_sub) + 3, '\ast');
+                end
+            end
         end
     end
 
     ylabel('Accuracy (%)');
     title('10 fold C-V, 50 sessions','FontSize',16);   
     set(gca,'box','off','tickDir','out')
-    grid on;
+    grid off;
     
     if exist('config', 'var')
         legend(b,config,'Location', 'northwest')
