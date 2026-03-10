@@ -22,18 +22,11 @@ RegionLabels = {'dlPFC', 'dmPFC', 'OFC', 'vlPFC', 'STG', 'MTG', 'ITG', 'dACC', '
     for i_sub = 1:length(subject)        
         nROI = numel(ROIchannels{i_sub});
     
-        mean_weights = abs(meanBetas{i_sub});
-        max_weights = abs(maxBetas{i_sub});
-    
-        mean_abs_beta_flat = reshape(mean_weights, size(mean_weights,1), []);  % now size = [60 x 500]
-        max_abs_beta_flat = reshape(max_weights, size(max_weights,1), []);
+        mean_abs_beta_flat = squeeze(mean(mean_weights, 2));  % now size = [chans x 500]
+        max_abs_beta_flat = squeeze(mean(max_weights, 2));  % treat each mean of 10 folds as one sample
         
-        beta_mean = squeeze(mean(mean_weights,[2 3]));
-        beta_max = squeeze(mean(max_weights,[2 3]));
-        
-        beta_mean_err = std(mean_abs_beta_flat,0,2)/sqrt(numel(max_abs_beta_flat)/10); % divide by 10 because of 10 folds
-        beta_max_err = std(max_abs_beta_flat,0,2)/sqrt(numel(max_abs_beta_flat)/10); % don't take 10 folds as independent samples; 
-        
+        % beta_mean = squeeze(mean(mean_weights,[2 3]));
+        % beta_max = squeeze(mean(max_weights,[2 3]));
         
         for iROI = 1:nROI
             
@@ -47,14 +40,19 @@ RegionLabels = {'dlPFC', 'dmPFC', 'OFC', 'vlPFC', 'STG', 'MTG', 'ITG', 'dACC', '
                 beta_mean_err_plot (iROI,i_sub) = 0;
                 beta_max_err_plot (iROI,i_sub) = 0;
             else
-                beta_mean_plot (iROI,i_sub) = mean(beta_mean(channelsinROI));
-                beta_max_plot (iROI,i_sub) = mean(beta_max(channelsinROI));
-                beta_mean_err_plot (iROI,i_sub) = mean(beta_mean_err(channelsinROI));
-                beta_max_err_plot (iROI,i_sub) = mean(beta_max_err(channelsinROI));
+                sel_mean_data = mean_abs_beta_flat(channelsinROI);
+                sel_max_data = max_abs_beta_flat(channelsinROI);
+                
+                beta_mean_plot (iROI,i_sub) = mean(sel_mean_data);
+                beta_max_plot (iROI,i_sub) = mean(sel_max_data);
+
+                beta_mean_err_plot (iROI,i_sub) = std(sel_mean_data,0)/sqrt(numel(sel_mean_data));
+                beta_max_err_plot (iROI,i_sub) = std(sel_max_data,0)/sqrt(numel(sel_max_data));
             end
         end
     end
 
+    
 beta_mean_plot = mean(beta_mean_plot,2);
 beta_mean_err_plot = mean(beta_mean_err_plot,2);
 beta_max_plot = mean(beta_max_plot,2);
