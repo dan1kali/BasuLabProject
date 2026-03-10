@@ -18,7 +18,7 @@ RegionLabels = {'dlPFC', 'dmPFC', 'OFC', 'vlPFC', 'STG', 'MTG', 'ITG', 'dACC', '
     beta_max_plot = zeros(10,length(subject));
     beta_mean_err_plot = zeros(10,length(subject));
     beta_max_err_plot = zeros(10,length(subject));
-        
+
     for i_sub = 1:length(subject)        
         nROI = numel(ROIchannels{i_sub});
     
@@ -31,8 +31,8 @@ RegionLabels = {'dlPFC', 'dmPFC', 'OFC', 'vlPFC', 'STG', 'MTG', 'ITG', 'dACC', '
         beta_mean = squeeze(mean(mean_weights,[2 3]));
         beta_max = squeeze(mean(max_weights,[2 3]));
         
-        beta_mean_err = std(mean_abs_beta_flat,0,2)/sqrt(size(mean_abs_beta_flat, 2)); 
-        beta_max_err = std(max_abs_beta_flat,0,2)/sqrt(size(max_abs_beta_flat, 2)); 
+        beta_mean_err = std(mean_abs_beta_flat,0,2)/sqrt(numel(max_abs_beta_flat)/10); % divide by 10 because of 10 folds
+        beta_max_err = std(max_abs_beta_flat,0,2)/sqrt(numel(max_abs_beta_flat)/10); % don't take 10 folds as independent samples; 
         
         
         for iROI = 1:nROI
@@ -119,7 +119,7 @@ linkaxes([meanplot, maxplot], 'y');
 sgtitle('Feature Contributions Across Regions', 'FontSize', 16);
 
 
-%% generate shap_vals_plot
+%% generate shap_vals_plot variable
 
 subject = {... 
 'BW42', 'MG51b', 'MG79', 'MG86', ...
